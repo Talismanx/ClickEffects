@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>ClickEffects — Make clicks feel alive</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="ClickEffects adds delightful, customizable particle pops to your mouse clicks.">
+  <meta property="og:title" content="ClickEffects — Make clicks feel alive">
+  <meta property="og:description" content="A lightweight Chrome extension for delightful click pops.">
+  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#0b1530">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="icon.png" />
+
+  <style>
+    :root {
+      --bg: #0b1530;
+      --text: #e8f0ff;
+      --muted: #b7c3e0;
+      --brand: #66ccff;
+      --brand-2: #5aa7ff;
+      --border: #253054;
+
+      /* Teaser FX color */
+      --fx-color: #66ccff;
+      --fx-count: 24;
+      --fx-size-min: 2;
+      --fx-size-max: 5;
+      --fx-speed-min: 160;
+      --fx-speed-max: 420;
+      --fx-gravity: 750;
+      --fx-life-min: 350;
+      --fx-life-max: 850;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial;
+      background:
+        radial-gradient(1200px 600px at 20% -10%, #142455 0%, rgba(20,36,85,0) 60%),
+        radial-gradient(900px 500px at 100% 20%, #0f2460 0%, rgba(15,36,96,0) 60%),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; text-decoration: none; }
+
+    .container {
+      width: min(1100px, 92vw);
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+
+    #fx-teaser {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #fx-teaser { display: none !important; }
+    }
+
+    header {
+      padding: 72px 0 48px;
+      text-align: center;
+    }
+    .logo {
+      width: clamp(400px, 20vw, 200px);
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      margin: 0 auto 24px;
+      display: block;
+    }
+    h1 {
+      font-size: clamp(36px, 5vw, 56px);
+      margin: 0 0 12px;
+      letter-spacing: -0.02em;
+    }
+    .sub {
+      font-size: clamp(16px, 1.7vw, 18px);
+      color: var(--muted);
+      margin: 0 0 28px;
+      max-width: 680px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 20px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, var(--brand), var(--brand-2));
+      color: #0b1020;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      transition: transform .15s ease, filter .15s ease;
+      box-shadow: 0 8px 20px rgba(102,204,255,0.25);
+    }
+    .btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
+
+    section.features {
+      padding: 28px 0 84px;
+      text-align: center;
+    }
+    .features-grid {
+      margin-top: 28px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 18px;
+    }
+    .card {
+      border: 1px solid var(--border);
+      background: rgba(15,20,45,0.7);
+      border-radius: 14px;
+      padding: 20px;
+      text-align: left;
+      transition: transform .15s ease, box-shadow .15s ease;
+    }
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 24px rgba(0,0,0,0.25);
+    }
+    .card h3 { margin: 0 0 8px; font-size: 18px; }
+    .card p  { margin: 0; color: var(--muted); font-size: 15px; }
+
+    footer {
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      padding: 24px 0 48px;
+      text-align: center;
+    }
+
+    /* Floating tip (centered) */
+    .click-tip {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 18px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(17,28,60,0.9);
+      color: var(--muted);
+      backdrop-filter: blur(6px);
+      box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+      animation: tip-bob 2.8s ease-in-out infinite;
+      transition: opacity .35s ease, transform .35s ease;
+    }
+    .click-tip.hide {
+      opacity: 0;
+      transform: translate(-50%, calc(-50% + 10px));
+      pointer-events: none;
+    }
+    .click-tip .dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--brand);
+      box-shadow: 0 0 14px rgba(102,204,255,0.7);
+    }
+    .click-tip .txt { font-size: 15px; }
+    @keyframes tip-bob {
+      0%,100% { transform: translate(-50%, -50%); }
+      50%     { transform: translate(-50%, calc(-50% - 6px)); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .click-tip { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Teaser canvas -->
+  <canvas id="fx-teaser"></canvas>
+
+  <!-- Centered tip -->
+  <div class="click-tip" id="clickTip" role="status" aria-live="polite">
+    <span class="dot" aria-hidden="true"></span>
+    <span class="txt">Click anywhere!</span>
+  </div>
+
+  <header>
+    <div class="container">
+      <img src="icon.png" alt="ClickEffects logo" class="logo" width="384" height="256">
+      <h1>Make clicks feel <span style="background:linear-gradient(90deg,var(--brand),var(--brand-2));-webkit-background-clip:text;background-clip:text;color:transparent">alive</span>.</h1>
+      <p class="sub">
+        ClickEffects adds delightful, customizable particle pops to every mouse click.
+        Choose your color and vibe—subtle or sparkly—for a browsing experience that’s more fun.
+      </p>
+      <a id="download" class="btn" href="#download" rel="nofollow">
+        <svg width="18" height="18" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <path fill="#FBBC05" d="M24 9h16a19 19 0 0 1 0 30L24 24z"/>
+          <path fill="#34A853" d="M24 24 8 39A19 19 0 0 1 24 9v15z"/>
+          <path fill="#EA4335" d="M40 9 24 24 16 9z"/>
+          <circle cx="24" cy="24" r="8" fill="#1a73e8"/>
+        </svg>
+        <span>Add to Chrome</span>
+      </a>
+    </div>
+  </header>
+
+  <section class="features">
+    <div class="container">
+      <h2 style="margin:0 0 8px; font-size: clamp(24px, 3.2vw, 32px);">Why ClickEffects?</h2>
+      <p style="margin:0; color:var(--muted); max-width:720px; margin-left:auto; margin-right:auto;">
+        A tiny extension that brings a little delight to every click.
+      </p>
+
+      <div class="features-grid">
+        <article class="card">
+          <h3>Delightful Click Pops</h3>
+          <p>Clean particle bursts that feel smooth and responsive.</p>
+        </article>
+        <article class="card">
+          <h3>Customize the Vibe</h3>
+          <p>Pick colors that match your mood or brand. Subtle glow or bright pop—your choice.</p>
+        </article>
+        <article class="card">
+          <h3>Tiny & Efficient</h3>
+          <p>Minimal footprint and optimized drawing. Built to stay out of the way.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <small>© <span id="year"></span> ClickEffects. All rights reserved.</small>
+    </div>
+  </footer>
+
+  <script>
+  // Click teaser (particles only)
+  (() => {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const canvas = document.getElementById('fx-teaser');
+    const ctx = canvas.getContext('2d');
+
+    let dpr = 1;
+    function resize() {
+      dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      const w = Math.floor(innerWidth * dpr);
+      const h = Math.floor(innerHeight * dpr);
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w; canvas.height = h;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+    }
+    addEventListener('resize', resize, { passive: true });
+    resize();
+
+    const rand = (a, b) => a + Math.random() * (b - a);
+    const particles = [];
+    const css = (name, fallback) => {
+      const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      return v || fallback;
+    };
+    const cssNum = (name, fallback) => {
+      const n = parseFloat(css(name, ""));
+      return Number.isFinite(n) ? n : fallback;
+    };
+
+    function spawn(x, y) {
+      const count = parseInt(css('--fx-count', '20'), 10);
+      const col = css('--fx-color', '#66ccff');
+      const sMin = cssNum('--fx-size-min', 2), sMax = cssNum('--fx-size-max', 5);
+      const spMin = cssNum('--fx-speed-min', 160), spMax = cssNum('--fx-speed-max', 420);
+      const lifeMin = cssNum('--fx-life-min', 350), lifeMax = cssNum('--fx-life-max', 850);
+
+      for (let i = 0; i < count; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const spd = rand(spMin, spMax);
+        const life = rand(lifeMin, lifeMax);
+        particles.push({
+          x, y,
+          vx: Math.cos(ang) * spd,
+          vy: Math.sin(ang) * spd,
+          life,
+          maxLife: life,
+          size: rand(sMin, sMax),
+          color: col
+        });
+      }
+    }
+
+    let last = performance.now();
+    function tick(now) {
+      const dt = (now - last) / 1000; last = now;
+      const drag = 0.0009;
+      const g = cssNum('--fx-gravity', 750);
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.vy += g * dt;
+        const d = (dt * 1000);
+        p.vx *= (1 - drag * d);
+        p.vy *= (1 - drag * d);
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.life -= (dt * 1000);
+        if (p.life <= 0) particles.splice(i, 1);
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (const p of particles) {
+        const a = Math.max(0, p.life / p.maxLife);
+        ctx.globalAlpha = a;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+
+    addEventListener('pointerdown', (e) => {
+      spawn(e.clientX, e.clientY);
+      const tip = document.getElementById('clickTip');
+      if (tip && !tip.classList.contains('hide')) tip.classList.add('hide');
+    }, { passive: true });
+
+    setTimeout(() => {
+      const tip = document.getElementById('clickTip');
+      if (tip && !tip.classList.contains('hide')) tip.classList.add('hide');
+    }, 8000);
+  })();
+
+  document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
